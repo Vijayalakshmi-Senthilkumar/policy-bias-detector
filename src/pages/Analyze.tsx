@@ -1,0 +1,202 @@
+import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Layout } from '@/components/layout';
+import { useAuth } from '@/hooks/useAuth';
+import { generateMockAnalysis, samplePolicyText } from '@/lib/mockData';
+import { analysisStorage } from '@/lib/auth';
+import { FileText, Upload, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+export default function Analyze() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [policyName, setPolicyName] = useState('');
+  const [policyText, setPolicyText] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    
+    if (file.type === 'text/plain') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        setPolicyText(text);
+        setFileName(file.name);
+        if (!policyName) {
+          setPolicyName(file.name.replace(/\.[^/.]+$/, ''));
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      // For demo purposes, show a message that PDF/DOCX parsing would happen on a real backend
+      toast({
+        title: 'File uploaded',
+        description: 'In production, this would parse the document. For demo, please paste the text directly.',
+      });
+      setFileName(file.name);
+      if (!policyName) {
+        setPolicyName(file.name.replace(/\.[^/.]+$/, ''));
+      }
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!policyText.trim()) {
+      toast({
+        title: 'Policy text required',
+        description: 'Please paste or upload a policy to analyze.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsAnalyzing(true);
+
+    // Simulate API delay
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    const analysis = generateMockAnalysis(
+      policyText,
+      policyName || 'Untitled Policy'
+    );
+
+    // Save to localStorage if user is logged in
+    if (user) {
+      analysisStorage.save(analysis);
+    }
+
+    setIsAnalyzing(false);
+    navigate(`/results/${analysis.id}`, { state: { analysis } });
+  };
+
+  const loadSamplePolicy = () => {
+    setPolicyText(samplePolicyText);
+    setPolicyName('Sample Employee Conduct Policy');
+    toast({
+      title: 'Sample loaded',
+      description: 'A sample policy with various bias examples has been loaded.',
+    });
+  };
+
+  return (
+    <Layout>
+      <div className="container py-12 md:py-20">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-10">
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Analyze Your Policy
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Paste your policy text or upload a document to detect potential bias.
+            </p>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg p-6 md:p-8 shadow-sm">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="policyName">Policy Name (optional)</Label>
+                <Input
+                  id="policyName"
+                  placeholder="e.g., Employee Conduct Policy"
+                  value={policyName}
+                  onChange={(e) => setPolicyName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="policyText">Policy Text</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={loadSamplePolicy}
+                    className="text-primary gap-1"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Load sample
+                  </Button>
+                </div>
+                <Textarea
+                  id="policyText"
+                  placeholder="Paste your company policy text here..."
+                  value={policyText}
+                  onChange={(e) => setPolicyText(e.target.value)}
+                  className="min-h-[300px] font-mono text-sm"
+                />
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-sm text-muted-foreground">or</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.pdf,.docx"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload Document (PDF, DOCX, TXT)
+                </Button>
+                {fileName && (
+                  <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    {fileName}
+                  </p>
+                )}
+              </div>
+
+              <Button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || !policyText.trim()}
+                size="lg"
+                className="w-full gap-2"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    Analyze Policy
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+
+              {!user && (
+                <p className="text-sm text-muted-foreground text-center">
+                  <a href="/auth" className="text-primary hover:underline">Sign in</a> to save your analyses
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}
