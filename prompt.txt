@@ -1,0 +1,68 @@
+Create a professional, clean, industry-standard web frontend for an AI product named 
+“AI System That Detects Hidden Bias in Company Policies”.
+
+The target users are HR teams, legal/compliance teams, policy writers, and company leadership.
+The design must look trustworthy, enterprise-ready, and minimal (no flashy or playful UI).
+
+Overall Style:
+- Clean, modern, corporate design
+- Neutral color palette (white, light gray, soft blue)
+- High readability and accessibility
+- Suitable for enterprise SaaS products
+- Desktop-first, responsive layout
+
+Pages & Sections:
+
+1. Landing Page
+- Top navigation bar with logo on the left and menu items:
+  Home, Features, How It Works, Demo, About
+- Hero section:
+  - Headline: “Detect Hidden Bias in Company Policies Using AI”
+  - Subtext: “Automatically identify, explain, and correct biased language in workplace policies.”
+  - Primary CTA button: “Analyze Policy”
+- Trust-focused design (subtle icons, clean spacing)
+
+2. Policy Analysis Page (Main Feature)
+- Large text input area to paste company policy text
+- Option to upload a document (PDF, DOCX, TXT)
+- “Analyze Policy” button (primary action)
+
+3. Analysis Results Dashboard
+- Clean dashboard layout with cards:
+  - Total Bias Instances Found
+  - Overall Bias Severity Score (Low / Medium / High)
+- Section showing policy text with biased sentences highlighted
+- On selecting a highlighted sentence:
+  - Bias type (e.g., Gender, Age, Disability)
+  - Simple explanation of why it is biased
+  - Suggested inclusive rewrite
+
+4. Bias Breakdown Section
+- Simple charts or cards showing:
+  - Bias categories detected
+  - Count per category
+
+5. UX & UI Requirements
+- Clear typography (sans-serif, professional fonts)
+- Consistent spacing and alignment
+- No animations that distract
+- Focus on clarity and explainability
+- Buttons and inputs styled for enterprise users
+
+6. Footer
+- Minimal footer with product name and description
+- No social media clutter
+
+Technical Expectations:
+- React-based frontend
+- Component-driven structure
+- Clean layout suitable for integration with backend APIs
+- Placeholder API calls allowed
+
+Do NOT include:
+- Gamification
+- Bright colors or gradients
+- Overly complex animations
+- Casual or playful tone
+
+The final UI should feel like a real HR/compliance SaaS product used in professional environments.

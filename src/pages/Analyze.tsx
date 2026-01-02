@@ -21,6 +21,7 @@ export default function Analyze() {
   const [policyText, setPolicyText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -34,29 +35,39 @@ export default function Analyze() {
         const text = e.target?.result as string;
         setPolicyText(text);
         setFileName(file.name);
+        setSelectedFile(null); // Clear file if text is loaded
         if (!policyName) {
           setPolicyName(file.name.replace(/\.[^/.]+$/, ''));
         }
       };
       reader.readAsText(file);
-    } else {
-      // For demo purposes, show a message that PDF/DOCX parsing would happen on a real backend
-      toast({
-        title: 'File uploaded',
-        description: 'In production, this would parse the document. For demo, please paste the text directly.',
-      });
+    } else if (['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.type)) {
+      // Store file in state for later upload
+      setSelectedFile(file);
       setFileName(file.name);
+      setPolicyText(''); // Clear text if file is uploaded
       if (!policyName) {
         setPolicyName(file.name.replace(/\.[^/.]+$/, ''));
       }
+      toast({
+        title: 'File selected',
+        description: `"${file.name}" will be parsed when you analyze it.`,
+      });
+    } else {
+      toast({
+        title: 'Unsupported file type',
+        description: 'Please upload a TXT, PDF, or DOCX file.',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleAnalyze = async () => {
-    if (!policyText.trim()) {
+    // Check if we have either text or a file
+    if (!policyText.trim() && !selectedFile) {
       toast({
         title: 'Policy text required',
-        description: 'Please paste or upload a policy to analyze.',
+        description: 'Please paste text or upload a policy to analyze.',
         variant: 'destructive',
       });
       return;
@@ -64,21 +75,87 @@ export default function Analyze() {
 
     setIsAnalyzing(true);
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      // Check if backend is available
+      const backendURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      let response;
+      
+      // If we have a selected file, send it to backend for parsing
+      if (selectedFile) {
+        console.log('Sending file to backend:', selectedFile.name);
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('policyName', policyName || selectedFile.name);
+        
+        response = await fetch(`${backendURL}/api/analysis/analyze`, {
+          method: 'POST',
+          ...(user && { headers: { 'Authorization': `Bearer ${user.token}` } }),
+          body: formData,
+        });
+      } else {
+        // Send as JSON with text
+        console.log('Sending text to backend');
+        response = await fetch(`${backendURL}/api/analysis/analyze`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(user && { 'Authorization': `Bearer ${user.token}` }),
+          },
+          body: JSON.stringify({
+            policyText: policyText.trim(),
+            policyName: policyName || 'Untitled Policy',
+          }),
+        });
+      }
 
-    const analysis = generateMockAnalysis(
-      policyText,
-      policyName || 'Untitled Policy'
-    );
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Backend error:', error);
+        toast({
+          title: 'Analysis failed',
+          description: error.error || 'Failed to analyze policy',
+          variant: 'destructive',
+        });
+        setIsAnalyzing(false);
+        return;
+      }
 
-    // Save to localStorage if user is logged in
-    if (user) {
-      analysisStorage.save(analysis);
+      const data = await response.json();
+      console.log('Analysis response:', data);
+      if (data.success) {
+        // Clear file selection
+        setSelectedFile(null);
+        setIsAnalyzing(false);
+        navigate(`/results/${data.data.id}`, { state: { analysis: data.data } });
+      } else {
+        toast({
+          title: 'Analysis failed',
+          description: 'Backend returned error',
+          variant: 'destructive',
+        });
+        setIsAnalyzing(false);
+      }
+    } catch (error) {
+      console.error('Analysis error:', error);
+      // Fallback to mock analysis if backend is not available
+      toast({
+        title: 'Using demo mode',
+        description: 'Backend not available. Using sample analysis.',
+      });
+
+      const analysis = generateMockAnalysis(
+        policyText,
+        policyName || 'Untitled Policy'
+      );
+
+      if (user) {
+        analysisStorage.save(analysis);
+      }
+
+      setIsAnalyzing(false);
+      navigate(`/results/${analysis.id}`, { state: { analysis } });
     }
-
-    setIsAnalyzing(false);
-    navigate(`/results/${analysis.id}`, { state: { analysis } });
   };
 
   const loadSamplePolicy = () => {

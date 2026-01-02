@@ -1,0 +1,283 @@
+BACKEND SERVICES TODO LIST - Policy Bias Detector
+=================================================
+
+PROJECT OVERVIEW:
+- Python Flask backend for AI-powered policy bias detection
+- Uses Groq LLM API for intelligent bias analysis
+- Provides REST API endpoints for frontend integration
+- Handles document parsing, user authentication, and data persistence
+
+PHASE 1: INFRASTRUCTURE & SETUP
+================================
+
+[✓] 1. Create backend folder structure
+    - app/services/ - Core business logic
+    - app/routes/ - Flask route handlers
+    - app/models/ - Database/data models
+    - app/utils/ - Utility functions
+    - app/config/ - Configuration files
+    
+[✓] 2. Setup Python project
+    - Create requirements.txt with dependencies
+    - Create .env template for API keys (GROQ_API_KEY, JWT_SECRET, DB_URL)
+    - Create main.py/app.py as Flask entry point
+
+[ ] 3. Configure Flask app
+    - Setup Flask application factory
+    - Configure CORS for frontend communication
+    - Setup error handling middleware
+    - Configure logging
+
+[ ] 4. Setup Database
+    - Configure SQLAlchemy ORM
+    - Create database connection from .env
+    - Create database models for User, AnalysisResult, BiasInstance
+
+
+PHASE 2: LLM INTEGRATION (Groq API)
+====================================
+
+[ ] 5. Implement Groq Service (groq_service.py)
+    - Initialize Groq client with API key from .env
+    - Create analyze_policy() method to send policy text to LLM
+    - Prompt engineering for structured bias detection response
+    - Handle API errors and timeouts gracefully
+    - Return structured JSON response with bias instances
+
+[ ] 6. Implement Bias Extraction Service (bias_extractor.py)
+    - Parse Groq LLM response into BiasInstance objects
+    - Extract: bias type, severity, explanation, suggested rewrite
+    - Calculate overall severity score
+    - Generate bias category breakdown
+    - Validate extracted data
+
+
+PHASE 3: POLICY ANALYSIS
+========================
+
+[ ] 7. Implement Bias Detection Service (bias_detector.py)
+    - Main orchestrator for policy analysis
+    - Call Groq service for LLM analysis
+    - Call bias extraction service to structure results
+    - Generate comprehensive AnalysisResult object
+    - Store results in database
+
+[ ] 8. Implement Document Parser (document_parser.py)
+    - Parse TXT files
+    - Parse PDF files (use PyPDF2)
+    - Parse DOCX files (use python-docx)
+    - Extract clean text from documents
+    - Handle parsing errors gracefully
+
+
+PHASE 4: API ENDPOINTS
+======================
+
+[ ] 9. Create Analysis Route (/api/analyze)
+    - POST endpoint to accept policy text/file
+    - Validate input
+    - Call bias detection service
+    - Return analysis results (AnalysisResult object)
+    - Handle file uploads
+
+[ ] 10. Create Results Route (/api/results/<id>)
+     - GET endpoint to retrieve stored analysis by ID
+     - Include all bias instances and metadata
+     - Add pagination for large policy documents
+
+[ ] 11. Create User Routes (/api/auth/*)
+     - POST /api/auth/signup - User registration with JWT
+     - POST /api/auth/login - User authentication with JWT
+     - POST /api/auth/logout - Session termination
+     - GET /api/user/analyses - List user's past analyses
+     - DELETE /api/analyses/<id> - Delete analysis
+
+[ ] 12. Create Utility Routes
+     - GET /api/health - Health check endpoint
+     - GET /api/models - List available analysis models
+     - POST /api/feedback - Collect user feedback
+
+
+PHASE 5: DATABASE & PERSISTENCE
+================================
+
+[ ] 13. Implement User Model (models/user.py)
+     - id (primary key)
+     - email (unique, indexed)
+     - password_hash
+     - name
+     - created_at
+     - updated_at
+     - Methods: hash_password(), verify_password()
+
+[ ] 14. Implement AnalysisResult Model (models/analysis.py)
+     - id (primary key)
+     - user_id (foreign key)
+     - policy_name
+     - policy_text
+     - analyzed_at
+     - total_bias_count
+     - overall_severity
+     - created_at
+     - updated_at
+
+[ ] 15. Implement BiasInstance Model (models/bias_instance.py)
+     - id (primary key)
+     - analysis_id (foreign key)
+     - original_text
+     - bias_type (gender, age, disability, racial, other)
+     - severity (low, medium, high)
+     - explanation
+     - suggested_rewrite
+     - start_index
+     - end_index
+
+
+PHASE 6: AUTHENTICATION & SECURITY
+===================================
+
+[ ] 16. Implement JWT Authentication Service (auth_service.py)
+     - Generate JWT tokens
+     - Verify JWT tokens
+     - Create token refresh mechanism
+     - Hash/verify passwords with bcrypt
+
+[ ] 17. Implement Auth Middleware
+     - Token validation for protected routes
+     - Role-based access control (if needed)
+     - Error handling for expired tokens
+
+[ ] 18. Security Hardening
+     - Add rate limiting
+     - Input validation for all endpoints
+     - SQL injection prevention (SQLAlchemy ORM)
+     - CORS configuration
+     - Environment variable validation
+
+
+PHASE 7: TESTING & DEPLOYMENT
+==============================
+
+[ ] 19. Write Unit Tests
+     - Test Groq service with mock responses
+     - Test bias extraction logic
+     - Test document parsing
+     - Test API endpoints
+     - Test authentication
+
+[ ] 20. Integration Testing
+     - Test full pipeline (upload → analyze → results)
+     - Test with real Groq API (if quota available)
+     - Test database persistence
+     - Test concurrent requests
+
+[ ] 21. Deployment Configuration
+     - Create docker setup (Dockerfile)
+     - Create .env.example template
+     - Create README with setup instructions
+     - Create startup script
+
+[ ] 22. Final Integration
+     - Connect frontend to backend API
+     - Test end-to-end workflow
+     - Performance optimization
+     - Error handling refinement
+
+
+DEPENDENCIES (requirements.txt)
+==============================
+Flask==3.0.0
+Flask-CORS==4.0.0
+SQLAlchemy==2.0.0
+python-dotenv==1.0.0
+groq==0.7.0
+PyPDF2==4.0.0
+python-docx==0.8.11
+PyJWT==2.8.0
+bcrypt==4.1.0
+requests==2.31.0
+pydantic==2.5.0
+gunicorn==21.2.0
+
+
+GROQ LLM PROMPT STRATEGY
+========================
+
+1. SYSTEM PROMPT:
+   - Define role as expert bias detection assistant
+   - Specify output format (JSON)
+   - Provide bias categories and severity levels
+   - Give examples of each bias type
+
+2. USER PROMPT:
+   - Send company policy text
+   - Request structured analysis
+   - Ask for specific bias categories
+   - Request suggestions for rewrite
+
+3. RESPONSE FORMAT:
+   {
+     "bias_instances": [
+       {
+         "text": "original text with bias",
+         "type": "gender|age|disability|racial|other",
+         "severity": "low|medium|high",
+         "explanation": "why this is biased",
+         "suggested_rewrite": "inclusive alternative",
+         "start_index": 123,
+         "end_index": 145
+       }
+     ],
+     "summary": {
+       "total_bias_count": 5,
+       "overall_severity": "medium",
+       "bias_breakdown": {
+         "gender": 2,
+         "age": 1,
+         "disability": 1,
+         "racial": 1,
+         "other": 0
+       }
+     }
+   }
+
+4. MODEL RECOMMENDATION:
+   - Use: llama-3.3-70b-versatile (best for accuracy)
+   - Alternative: mixtral-8x7b-32768 (faster)
+
+
+API RESPONSE STRUCTURE
+=====================
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "id": "analysis-1234567890",
+    "policyName": "Policy Name",
+    "policyText": "Full policy text...",
+    "analyzedAt": "2024-01-02T10:30:00Z",
+    "totalBiasCount": 5,
+    "overallSeverity": "medium",
+    "biasInstances": [...],
+    "biasByCategory": {...}
+  }
+}
+
+Error Response:
+{
+  "success": false,
+  "error": "Error message",
+  "code": "ERROR_CODE"
+}
+
+
+ENVIRONMENT VARIABLES (.env)
+============================
+GROQ_API_KEY=your_api_key_here
+FLASK_ENV=development
+FLASK_DEBUG=True
+JWT_SECRET=your_jwt_secret_key
+DATABASE_URL=sqlite:///policy_bias.db
+FRONTEND_URL=http://localhost:5173
+LOG_LEVEL=INFO

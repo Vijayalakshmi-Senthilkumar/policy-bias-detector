@@ -24,6 +24,7 @@ export default function Results() {
   const { toast } = useToast();
   const analysis = location.state?.analysis as AnalysisResult | undefined;
   const [selectedBias, setSelectedBias] = useState<BiasInstance | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   if (!analysis) {
     return (
@@ -57,12 +58,133 @@ export default function Results() {
     toast({ title: 'Copied!', description: 'Suggestion copied to clipboard.' });
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
+    if (!analysis?.id) {
+      console.error('No analysis ID:', analysis);
+      toast({
+        title: 'Export failed',
+        description: 'Analysis ID not found',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsExporting(true);
+    console.log('Starting export for analysis ID:', analysis.id);
     toast({ title: 'Export started', description: 'PDF report is being generated...' });
-    // In production, this would generate a real PDF
-    setTimeout(() => {
-      toast({ title: 'PDF Ready', description: 'Your report has been downloaded.' });
-    }, 1500);
+
+    try {
+      const backendURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      console.log('Backend URL:', backendURL);
+      console.log('Export endpoint:', `${backendURL}/api/analysis/${analysis.id}/export-pdf`);
+      
+      const response = await fetch(`${backendURL}/api/analysis/${analysis.id}/export-pdf`);
+
+      console.log('Export response status:', response.status);
+      console.log('Export response headers:', Array.from(response.headers.entries()));
+
+      if (!response.ok) {
+        let error = {};
+        try {
+          error = await response.json();
+        } catch (e) {
+          error = { error: `HTTP ${response.status}` };
+        }
+        console.error('Backend export error:', error);
+        toast({
+          title: 'Export failed',
+          description: error.error || `Failed to export PDF (${response.status})`,
+          variant: 'destructive',
+        });
+        setIsExporting(false);
+        return;
+      }
+
+      // Check if we got a PDF or JSON
+      const contentType = response.headers.get('content-type');
+      console.log('Response content type:', contentType);
+      
+      if (contentType?.includes('application/pdf')) {
+        // PDF response
+        console.log('Received PDF response');
+        const blob = await response.blob();
+        console.log('PDF blob size:', blob.size);
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${analysis.policyName.replace(/\s+/g, '_')}_analysis.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        toast({
+          title: 'PDF Downloaded',
+          description: 'Your analysis report has been downloaded successfully.',
+        });
+      } else {
+        // JSON response - generate PDF on frontend
+        console.log('Received JSON response');
+        const data = await response.json();
+        console.log('JSON response data:', data);
+        if (data.success) {
+          generatePDFFromData(data.data, analysis.policyName);
+        } else {
+          toast({
+            title: 'Export failed',
+            description: data.error || 'Backend returned error',
+            variant: 'destructive',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Export failed',
+        description: 'Failed to export PDF. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const generatePDFFromData = (data: any, policyName: string) => {
+    // Fallback: generate simple PDF-like document
+    let content = 'POLICY BIAS ANALYSIS REPORT\n';
+    content += '========================================\n\n';
+    content += `Policy Name: ${policyName}\n`;
+    content += `Analysis Date: ${new Date(data.analyzedAt).toLocaleDateString()}\n\n`;
+    content += 'SUMMARY\n';
+    content += '--------\n';
+    content += `Total Issues: ${data.totalBiasCount}\n`;
+    content += `Overall Severity: ${data.overallSeverity.toUpperCase()}\n\n`;
+    
+    if (data.biasInstances && data.biasInstances.length > 0) {
+      content += 'DETECTED ISSUES\n';
+      content += '--------\n';
+      data.biasInstances.forEach((bias: any, index: number) => {
+        content += `\n${index + 1}. ${bias.biasType.toUpperCase()} (Severity: ${bias.severity})\n`;
+        content += `   Text: "${bias.originalText}"\n`;
+        content += `   Explanation: ${bias.explanation}\n`;
+        content += `   Suggested Fix: ${bias.suggestedRewrite}\n`;
+      });
+    }
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${policyName.replace(/\s+/g, '_')}_analysis.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Report Downloaded',
+      description: 'Your analysis report has been downloaded as a text file.',
+    });
   };
 
   return (
@@ -72,8 +194,9 @@ export default function Results() {
           <Button variant="ghost" onClick={() => navigate('/analyze')} className="gap-2">
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
-          <Button onClick={exportPDF} className="gap-2">
-            <Download className="h-4 w-4" /> Export PDF
+          <Button onClick={exportPDF} disabled={isExporting} className="gap-2">
+            <Download className="h-4 w-4" /> 
+            {isExporting ? 'Exporting...' : 'Export PDF'}
           </Button>
         </div>
 
