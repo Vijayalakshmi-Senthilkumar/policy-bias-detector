@@ -32,30 +32,38 @@ export default function Auth() {
     e.preventDefault();
     setIsLoading(true);
 
-    if (mode === 'login') {
-      const result = login(email, password);
-      if (result.success) {
-        toast({ title: 'Welcome back!', description: 'You have been signed in successfully.' });
-        navigate('/analyze');
+    try {
+      if (mode === 'login') {
+        const result = await login(email, password);
+        if (result.success) {
+          toast({ title: 'Welcome back!', description: 'You have been signed in successfully.' });
+          navigate('/analyze');
+        } else {
+          toast({ title: 'Sign in failed', description: result.error, variant: 'destructive' });
+        }
       } else {
-        toast({ title: 'Sign in failed', description: result.error, variant: 'destructive' });
+        if (!name.trim()) {
+          toast({ title: 'Name required', description: 'Please enter your name.', variant: 'destructive' });
+          setIsLoading(false);
+          return;
+        }
+        const result = await signup(email, password, name);
+        if (result.success) {
+          toast({ title: 'Account created!', description: 'Welcome to PolicyGuard AI.' });
+          navigate('/analyze');
+        } else {
+          toast({ title: 'Sign up failed', description: result.error, variant: 'destructive' });
+        }
       }
-    } else {
-      if (!name.trim()) {
-        toast({ title: 'Name required', description: 'Please enter your name.', variant: 'destructive' });
-        setIsLoading(false);
-        return;
-      }
-      const result = signup(email, password, name);
-      if (result.success) {
-        toast({ title: 'Account created!', description: 'Welcome to PolicyGuard AI.' });
-        navigate('/analyze');
-      } else {
-        toast({ title: 'Sign up failed', description: result.error, variant: 'destructive' });
-      }
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'An unexpected error occurred. Please try again.', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (

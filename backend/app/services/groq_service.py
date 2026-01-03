@@ -91,6 +91,10 @@ If no bias is found, return an empty bias_instances array but still include the 
             # Create the message for Groq API
             messages = [
                 {
+                    "role": "system",
+                    "content": self.system_prompt
+                },
+                {
                     "role": "user",
                     "content": f"""Please analyze the following company policy for biased language and respond with ONLY valid JSON:
 
@@ -109,7 +113,6 @@ Remember to respond ONLY with valid JSON, no other text."""
                 model=self.model,
                 temperature=0.3,  # Lower temperature for more consistent output
                 max_tokens=4096,
-                system=self.system_prompt,
             )
             
             logger.info("Groq API call completed successfully")

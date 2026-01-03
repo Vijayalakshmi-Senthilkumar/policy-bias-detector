@@ -248,7 +248,7 @@ export default function Analyze() {
 
               <Button
                 onClick={handleAnalyze}
-                disabled={isAnalyzing || !policyText.trim()}
+                disabled={isAnalyzing || (!policyText.trim() && !selectedFile)}
                 size="lg"
                 className="w-full gap-2"
               >

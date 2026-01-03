@@ -5,8 +5,8 @@ import { authService } from '@/lib/auth';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => { success: boolean; error?: string };
-  signup: (email: string, password: string, name: string) => { success: boolean; error?: string };
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -22,22 +22,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = (email: string, password: string) => {
-    const loggedInUser = authService.login(email, password);
-    if (loggedInUser) {
-      setUser(loggedInUser);
-      return { success: true };
+  const login = async (email: string, password: string) => {
+    try {
+      const loggedInUser = await authService.login(email, password);
+      if (loggedInUser) {
+        setUser(loggedInUser);
+        return { success: true };
+      }
+      return { success: false, error: 'Invalid email or password' };
+    } catch (error) {
+      return { success: false, error: 'Login failed. Please try again.' };
     }
-    return { success: false, error: 'Invalid email or password' };
   };
 
-  const signup = (email: string, password: string, name: string) => {
-    const newUser = authService.signup(email, password, name);
-    if (newUser) {
-      setUser(newUser);
-      return { success: true };
+  const signup = async (email: string, password: string, name: string) => {
+    try {
+      const newUser = await authService.signup(email, password, name);
+      if (newUser) {
+        setUser(newUser);
+        return { success: true };
+      }
+      return { success: false, error: 'An account with this email already exists' };
+    } catch (error) {
+      return { success: false, error: 'Signup failed. Please try again.' };
     }
-    return { success: false, error: 'An account with this email already exists' };
   };
 
   const logout = () => {

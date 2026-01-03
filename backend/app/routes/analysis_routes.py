@@ -65,20 +65,24 @@ def analyze():
         # Get policy name from form data or file name
         policy_name = request.form.get('policyName', file.filename)
         
-        logger.debug(f"File received: {file.filename}, size: {file.size} bytes, policy_name: {policy_name}")
-        
         if not file or file.filename == '':
             logger.warning("No file provided or empty filename")
             return jsonify({'success': False, 'error': 'No file provided'}), 400
         
-        if file.size > Config.MAX_FILE_SIZE:
-            logger.warning(f"File size exceeds limit: {file.size} > {Config.MAX_FILE_SIZE}")
+        # Read file content to check size
+        file_content = file.read()
+        file_size = len(file_content)
+        
+        logger.debug(f"File received: {file.filename}, size: {file_size} bytes, policy_name: {policy_name}")
+        
+        if file_size > Config.MAX_FILE_SIZE:
+            logger.warning(f"File size exceeds limit: {file_size} > {Config.MAX_FILE_SIZE}")
             return jsonify({'success': False, 'error': 'File size exceeds limit'}), 413
         
         try:
             file_ext = DocumentParser.get_file_extension(file.filename)
             logger.debug(f"Parsing file with extension: {file_ext}")
-            policy_text = DocumentParser.parse_file(file.read(), file_ext)
+            policy_text = DocumentParser.parse_file(file_content, file_ext)
             logger.debug(f"File parsed successfully, extracted text length: {len(policy_text)} characters")
         except ValueError as e:
             logger.error(f"File parsing error: {str(e)}")
@@ -111,6 +115,11 @@ def analyze():
             analysis_id = analysis.id
             db.refresh(analysis)
             logger.info(f"Analysis saved to database - ID: {analysis_id}")
+            
+            # Access relationships before closing session to avoid DetachedInstanceError
+            bias_instances_dicts = [b.to_dict() for b in analysis.bias_instances]
+            bias_by_category = bias_detection.get_bias_by_category(analysis)
+            
         finally:
             db.close()
         
@@ -123,8 +132,8 @@ def analyze():
                 'analyzedAt': analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
                 'totalBiasCount': analysis.total_bias_count,
                 'overallSeverity': analysis.overall_severity,
-                'biasInstances': [b.to_dict() for b in analysis.bias_instances],
-                'biasByCategory': bias_detection.get_bias_by_category(analysis),
+                'biasInstances': bias_instances_dicts,
+                'biasByCategory': bias_by_category,
             }
         }), 200
         
@@ -266,6 +275,13 @@ def export_analysis_pdf(analysis_id):
             logger.warning(f"Analysis not found for PDF export - ID: {analysis_id}")
             return jsonify({'success': False, 'error': 'Analysis not found'}), 404
         
+        # Access relationships while session is still active
+        bias_instances = list(analysis.bias_instances)
+        policy_name = analysis.policy_name
+        analyzed_at = analysis.analyzed_at
+        total_bias_count = analysis.total_bias_count
+        overall_severity = analysis.overall_severity
+        
         logger.debug(f"Generating PDF for analysis - ID: {analysis_id}")
         
         # Try to import reportlab for PDF generation
@@ -299,16 +315,16 @@ def export_analysis_pdf(analysis_id):
             
             # Add metadata
             meta_style = styles['Normal']
-            elements.append(Paragraph(f"<b>Policy Name:</b> {analysis.policy_name}", meta_style))
-            elements.append(Paragraph(f"<b>Analysis Date:</b> {analysis.analyzed_at.strftime('%B %d, %Y') if analysis.analyzed_at else 'N/A'}", meta_style))
+            elements.append(Paragraph(f"<b>Policy Name:</b> {policy_name}", meta_style))
+            elements.append(Paragraph(f"<b>Analysis Date:</b> {analyzed_at.strftime('%B %d, %Y') if analyzed_at else 'N/A'}", meta_style))
             elements.append(Spacer(1, 0.3*inch))
             
             # Add summary section
             elements.append(Paragraph("Summary", styles['Heading2']))
             summary_data = [
                 ['Metric', 'Value'],
-                ['Total Issues Found', str(analysis.total_bias_count)],
-                ['Overall Severity', analysis.overall_severity.upper()],
+                ['Total Issues Found', str(total_bias_count)],
+                ['Overall Severity', overall_severity.upper()],
             ]
             summary_table = Table(summary_data, colWidths=[2.5*inch, 2*inch])
             summary_table.setStyle(TableStyle([
@@ -325,9 +341,9 @@ def export_analysis_pdf(analysis_id):
             elements.append(Spacer(1, 0.3*inch))
             
             # Add bias instances
-            if analysis.bias_instances:
+            if bias_instances:
                 elements.append(Paragraph("Detected Issues", styles['Heading2']))
-                for i, bias in enumerate(analysis.bias_instances, 1):
+                for i, bias in enumerate(bias_instances, 1):
                     elements.append(Paragraph(
                         f"<b>Issue {i}: {bias.bias_type.upper()}</b> - Severity: <b>{bias.severity.upper()}</b>",
                         styles['Heading3']
@@ -351,7 +367,7 @@ def export_analysis_pdf(analysis_id):
                 pdf_buffer,
                 mimetype='application/pdf',
                 as_attachment=True,
-                attachment_filename=f"{analysis.policy_name.replace(' ', '_')}_analysis_{analysis_id}.pdf"
+                download_name=f"{policy_name.replace(' ', '_')}_analysis_{analysis_id}.pdf"
             )
             
         except ImportError as ie:
@@ -360,11 +376,11 @@ def export_analysis_pdf(analysis_id):
             return jsonify({
                 'success': True,
                 'data': {
-                    'policyName': analysis.policy_name,
-                    'analyzedAt': analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
-                    'totalBiasCount': analysis.total_bias_count,
-                    'overallSeverity': analysis.overall_severity,
-                    'biasInstances': [b.to_dict() for b in analysis.bias_instances],
+                    'policyName': policy_name,
+                    'analyzedAt': analyzed_at.isoformat() if analyzed_at else None,
+                    'totalBiasCount': total_bias_count,
+                    'overallSeverity': overall_severity,
+                    'biasInstances': [b.to_dict() for b in bias_instances],
                 }
             }), 200
         
