@@ -77,7 +77,7 @@ export default function Analyze() {
 
     try {
       // Check if backend is available
-      const backendURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const backendURL = import.meta.env.VITE_API_URL || 'https://policy-bias-detector-backend.onrender.com';
       
       let response;
       
