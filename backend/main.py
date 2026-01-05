@@ -52,8 +52,8 @@ def main():
         raise
     
     # Get host and port from environment or use defaults
-    host = os.getenv('FLASK_HOST', '127.0.0.1')
-    port = int(os.getenv('FLASK_PORT', 5000))
+    host = os.getenv('SERVER_HOST', '0.0.0.0')
+    port = int(os.getenv('SERVER_PORT', 5000))
     
     logger.info("=" * 80)
     logger.info(f"Flask server starting on {host}:{port}")
