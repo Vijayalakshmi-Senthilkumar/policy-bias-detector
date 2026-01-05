@@ -74,7 +74,7 @@ export default function Results() {
     toast({ title: 'Export started', description: 'PDF report is being generated...' });
 
     try {
-      const backendURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const backendURL = import.meta.env.VITE_API_URL || 'https://policy-bias-detector-backend.onrender.com';
       console.log('Backend URL:', backendURL);
       console.log('Export endpoint:', `${backendURL}/api/analysis/${analysis.id}/export-pdf`);
       
